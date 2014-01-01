@@ -47,33 +47,29 @@
 <script src="/socket.io/socket.io.js"></script>
 <script src="/scriptcard.js"></script>
 <script>
+
+  console.log("hello");
   var socket = io.connect();
   var state = null; // be the same accross all clients and server
-  var me = -1;  // our index to state.players (varies per-client)
+  var myIndex = -1; // our index to state.players (varies per-client)
+  var me = null;
   var choices = null;
 
-  socket.on('state',  function (data) { state  = data.state;  onReady(); });
-  socket.on('player', function (data) { me     = data.player; onReady(); });
+  socket.on('initialState',  function (data) {
+    state   = data.state;
+    myIndex = data.playerIndex;
+    me = state.players[myIndex];
 
-  function onReady() {
-    if (me<0 || !state) return; // we are not ready
+    socket.emit('playerReady');
+    console.log("omg")
 
-    if (me == 0) {
-      socket.emit('event', {
-        name: 'consolelog.consolelog',
-        data: { newName: 'bawb' }
-      });
-    }
-  }
+    $('#output').text('hello: ' + me.name);
+  });
+
 
 
 
   socket.on('event', function (data) {
-    eventFunction = eventFunctions[data.eventName];
-    if (!eventFunction) {
-      console.log('invalid eventName: ' + data.eventName);
-      return;
-    }
     eventFunction(data.eventData);
   });
 

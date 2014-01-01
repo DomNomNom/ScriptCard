@@ -1,5 +1,6 @@
 
 /*
+
 general terms:
     state:
         the game state.
@@ -47,14 +48,18 @@ general terms:
         A event causing a trigger to be put on the stack
         in the trigger example above, 'turnchange' would be a cause
 
-
 */
 
 // ====== state creation (only server should do this) ======
 
 function makePlayer(name) {
-    return { name: name };
+    return {
+        name: name,
+        ready: false,
+    };
 }
+
+function doNothing(state, event) { }
 
 var matchID = 0;
 function makeState() {
@@ -74,7 +79,12 @@ function makeState() {
         nextEventID: 1,
 
         // not to be transmitted
-        events: {}
+        events: {
+            // these three event functions only exist to allow for triggers
+            gameSetup:  doNothing,  // before the game starts
+            gameStart:  doNothing,  // causes the first turn to occur
+            stackEmpty: doNothing,  // starts off at the bottom of the stack
+        }
     };
 }
 
@@ -86,14 +96,16 @@ function loadPackIntoState(state, pack, packName) {
       console.error('duplicate event name: ' + globalEventName);
       continue;
     }
-    console.log('found event: ' + globalEventName);
+
+    // console.log('loading event: ' + globalEventName);
     state.events[globalEventName] = pack.events[eventName];
   }
 
   // triggers
   for (var triggerPhase in pack.triggers) {
-    if (!triggerPhase in state.triggers) {
+    if (!(triggerPhase in state.triggers)) {
         state.triggers[triggerPhase] = {};
+        console.log('new type of triggerPhase: ' + triggerPhase);
     }
     var statePhase = state.triggers[triggerPhase];
 
@@ -115,6 +127,9 @@ function loadPackIntoState(state, pack, packName) {
 
 // ====== state modification ======
 
+function makeEvent(state, name) { // shorthand function
+    return copyEvent(state, {name: name});
+}
 
 // performs a clone of the event and assigns a new id
 function copyEvent(state, event) {
@@ -153,11 +168,11 @@ function applyEvent(state, event) {
     }
     event = copyEvent(state, event); // ensure it is given a good id
 
+    stack.push(makeEvent(state, 'stackEmpty'));
+    stack.push(event);
 
     // while the stack is not empty, try to apply the top if the stack
     // limit the number of times we go through the loop
-    // stack.push({name: 'stackEmpty' });
-    stack.push(event);
     var eventInitiator = state.currentPlayer;
     var stackloops;
     for (stackloops=0; stack.length>0 && stackloops<9001; stackloops+=1) {
@@ -168,7 +183,7 @@ function applyEvent(state, event) {
         if (stack && imminentEvent===stack[stack.length-1]) { // are we still imminent?
             stack.pop();
             if (!imminentEvent.name) {
-                console.error('imminentEvent without name');
+                console.error('imminentEvent without name: ' + JSON.stringify(imminentEvent));
                 continue;
             }
             var eventFunction = state.events[imminentEvent.name];

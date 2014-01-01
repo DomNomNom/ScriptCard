@@ -3,9 +3,13 @@ function makePack(){
         cards: [],
         events: {
             consolelog: function (state, data) {
-                console.log("omg consolelog event!");
+                console.log("consolelog: " + JSON.stringify(data));
             }
         },
-        triggers: {}
+        triggers: {
+            'pre': {
+                'gameSetup': { name: 'consolelog.consolelog' }
+            }
+        }
     };
 }

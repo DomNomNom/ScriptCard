@@ -47,6 +47,7 @@ function packFilePath(packName) {
 
 var app = require('http').createServer(handler);
 var io = require('socket.io').listen(app);
+io.set('log level', 1);  // SILENCE!
 app.listen(9000);
 
 // sends a file to the user
@@ -67,7 +68,7 @@ function sendFile(res, fileName) {
 
 function handler(req, res) {
     var url = req.url;
-    if      (url == '/'             ) sendFile(res, 'index.html'        );
+    if      (url == '/'             ) sendFile(res, 'index.html'    );
     else if (url == '/scriptcard.js') sendFile(res, 'scriptcard.js' );
     else if (url == '/favicon.ico'  ) { }
     else console.log('bad URL: ' + url);
@@ -78,37 +79,38 @@ function handler(req, res) {
 
 // makes a game state, which is shared with another player
 var exisitingState = null;
-function matchMake() {
+function matchMake(packNames) {
     if (exisitingState) {
-        var ret = { state: exisitingState, player: 1};
+        var ret = { state: exisitingState, playerIndex: 1};
         exisitingState = null;
         return ret;
     }
     else {
         exisitingState = makeState();
-        return { state: exisitingState, player: 0};
+        for (var i in packNames) {
+            var packName = packNames[i];
+            if (!packName in packs) {
+                console.warn('unknown packName: ' + packName);
+            }
+            loadPackIntoState(exisitingState, packs[packName](), packName);
+        }
+        return { state: exisitingState, playerIndex: 0};
     }
 }
 
 io.sockets.on('connection', function (socket) {
-    var match = matchMake();
-    var player = match.player;
+    var packNames = ['cards', 'consolelog']; // this may be sent by the user
+    var match = matchMake(packNames);
     var state = match.state;
+    var playerIndex = match.playerIndex;
+    var player = state.players[playerIndex]
 
     // load the pack
-    var packNames = ['cards', 'consolelog']; // this may be sent by the user
-    for (var i in packNames) {
-        var packName = packNames[i];
-        if (!packName in packs) {
-            console.warn('unknown packName: ' + packName);
-        }
-        loadPackIntoState(state, packs[packName](), packName);
-    }
 
     socket.join(match.machID); // so we can talk to our partners
 
-    socket.emit('state', {state: state});
-    socket.emit('player', {player: player});
+    socket.emit('initialState', {state: state, playerIndex: playerIndex});
+
     socket.on('event', function (event) {
         if (!event.name)    {
             console.error('event without name');
@@ -119,6 +121,25 @@ io.sockets.on('connection', function (socket) {
         socket.broadcast.to(match.machID).emit('event', event);
 
         applyEvent(state, event);    // change the state
+    });
+    socket.on('playerReady', function () {
+        player.ready = true;
+        // check whether all are ready
+        allReady = true;
+        for (var i in state.players) {
+            if (!state.players[i].ready) {
+                allReady = false;
+                break;
+            }
+        }
+
+        console.log('one ready')
+        if (!allReady) return;
+        console.log('both ready')
+
+        // start the game
+        applyEvent(state, makeEvent(state, 'gameSetup'));
+        applyEvent(state, makeEvent(state, 'gameStart'));
     });
 });
 
