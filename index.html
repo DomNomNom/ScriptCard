@@ -16,29 +16,18 @@
     <div class="col-md-4">
       <h1>Script Card</h1>
 
+      <div class="alert alert-dismissable alert-danger hidden">
+        <button type="button" class="close" data-dismiss="alert">×</button>
+        <strong>Error:</strong>
+        <span id="errorText">omg something went terribly wrong</span>
+      </div>
+
       <div>&nbsp;</div>
       <h2 id="output">...</h2>
-    <!--
-        <div class="form-group " id="name-form-group">
-          <label class="control-label" for="name">Username:</label>
-          <input
-            class="form-control"
-            id="name"
-            placeholder="Your username here"
-            onchange="$('#name-form-group').removeClass('has-error');"
-          >
-        </div>
-       <button
-        type="button"
-        class="btn btn-default btn-lg"
-        onclick="grab();"
-      >
-        Grab the gold!
-      </button>
- -->
+      <button class"btn btn-big" id="actionButton">end turn</button>
 
     </div> <!-- collumn -->
-  </div>
+  </div> <!-- row -->
 
 </body>
 
@@ -48,35 +37,104 @@
 <script src="/scriptcard.js"></script>
 <script>
 
-  console.log("hello");
+  console.log("hello world!");
   var socket = io.connect();
   var state = null; // be the same accross all clients and server
   var myIndex = -1; // our index to state.players (varies per-client)
   var me = null;
   var choices = null;
+  // var packNames = ['base', 'cards', 'consolelog', 'turnChange'];
+  var packs = {};
+  var packsLoaded = {};
 
-  socket.on('initialState',  function (data) {
+  function importPack(packName) {
+    $.getScript(
+      '/packs/' + packName + '.js',  // url
+      function (data, textStatus, jqxhr) {
+        // console.log(data ); // Data returned
+        // console.log(textStatus ); // Success
+        // console.log(jqxhr.status ); // 200
+        // console.log("Load was performed." );
+
+        // note: we are executing arbitrary code from the server here
+        // eval.apply(this, [data]);
+        loadPackIntoState(state, makePack(), packName);
+        packs[packName] = makePack;
+        packsLoaded[packName] = true;
+
+        var allReady = true;
+        for (var key in packsLoaded) {
+          if (!packsLoaded[key]) {
+            allReady = false;
+            return;
+          }
+        }
+        if (allReady) {
+          console.log('player Ready!!!!');
+          socket.emit('playerReady');
+        }
+      }
+    );
+  }
+
+  socket.on('initialState', function (data) {
     state   = data.state;
     myIndex = data.playerIndex;
     me = state.players[myIndex];
 
-    socket.emit('playerReady');
-    console.log("omg")
+    // load the packs
+    // we set packsLoaded[...] = false first as we are doing asynchonous loading
+    for (var i in state.packNames) {
+      packsLoaded[state.packNames[i]] = false;
+    }
+    for (var i in state.packNames) {
+      importPack(state.packNames[i]);
+    }
 
     $('#output').text('hello: ' + me.name);
   });
 
 
 
+  socket.on('event', function (event) {
+    if (!event.name)    {
+        error('no event name');
+        return;
+    }
 
-  socket.on('event', function (data) {
-    eventFunction(data.eventData);
+
+    var requirement = state.requirements[event.name];
+    if (requirement) {
+      // check that the event meets the requrement
+      // we do this after relaying as the requirement function has the potential to change the state
+      if (!requirement(state, event)) {
+          error('event did not meet requirements: ' + JSON.stringify(event));
+          return;
+      }
+    }
+
+    // if there's no requirement, we just do what we're told by the server
+
+    applyEvent(state, event);    // change the state
+
   });
 
+  function error(errorMessage) {
+    console.error(errorMessage);
+    $('#errorText').text(errorMessage);
+  }
 
-  // console.log("hello ");
-  // board.init( $('#board_cont') );
-  // console.log("world ");
+  socket.on('actionError', function(data) {
+    error(data.errorMessage)
+  });
+
+  $('#actionButton').click(function buttonAction() {
+    console.log('ending turn');
+    var action = { name: 'turnChange.turnChange' }
+    socket.emit('action', action);
+    applyEvent(state, copyEvent(state, action));
+  });
+
 </script>
 
 </html>

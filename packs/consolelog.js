@@ -7,7 +7,7 @@ function makePack(){
             }
         },
         triggers: {
-            'pre': {
+            pre: {
                 'gameSetup': { name: 'consolelog.consolelog' }
             }
         }

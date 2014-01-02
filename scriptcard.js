@@ -27,6 +27,14 @@ general terms:
                 event.name will be the key for the current function in stack.events
         this function can change state and event
 
+    action:
+        A event caused by a player.
+        It has a .player reffering to the player who initiated the action.
+        It is a invalid action unless:
+            There is a function in state.requirements with the same key as the event function.
+            That function returns true.
+        These requirement functions are function(state, event) { return bool; }
+
 
     trigger:
         An event which is in a list within state.triggers.
@@ -51,6 +59,7 @@ general terms:
 */
 
 // ====== state creation (only server should do this) ======
+// optimization: only send the code that the client needs to the client
 
 function makePlayer(name) {
     return {
@@ -58,8 +67,6 @@ function makePlayer(name) {
         ready: false,
     };
 }
-
-function doNothing(state, event) { }
 
 var matchID = 0;
 function makeState() {
@@ -77,16 +84,17 @@ function makeState() {
             post: {}
         },
         nextEventID: 1,
+        playing: false,  // whether the game allows player actions at the moment
+        packNames: [],  // this variable comes from server.js
 
         // not to be transmitted
-        events: {
-            // these three event functions only exist to allow for triggers
-            gameSetup:  doNothing,  // before the game starts
-            gameStart:  doNothing,  // causes the first turn to occur
-            stackEmpty: doNothing,  // starts off at the bottom of the stack
-        }
+        requirements: {},
+            events: {},
     };
 }
+
+
+// this has to be done on the client side as well
 
 function loadPackIntoState(state, pack, packName) {
   // events
@@ -99,6 +107,20 @@ function loadPackIntoState(state, pack, packName) {
 
     // console.log('loading event: ' + globalEventName);
     state.events[globalEventName] = pack.events[eventName];
+  }
+
+  // requirements
+  for (var eventName in pack.requirements) {
+    var globalEventName = packName+'.'+eventName;
+    if (!(globalEventName in state.events)) {
+        console.warning("requirement without event: " + globalEventName);
+    }
+    if (globalEventName in state.requirements) {
+      console.error('duplicate requirement name: ' + globalEventName);
+      continue;
+    }
+
+    state.requirements[globalEventName] = pack.requirements[eventName];
   }
 
   // triggers
@@ -162,13 +184,13 @@ function pushTrigger(state, event, phase) {
 function applyEvent(state, event) {
     var stack = state.stack;
     console.log("applying event: " + event.name);
-    if (stack.length != 0)  {
+        if (stack.length != 0)  {
         console.error('stack needs to be emtpy');
         return;
     }
     event = copyEvent(state, event); // ensure it is given a good id
 
-    stack.push(makeEvent(state, 'stackEmpty'));
+    stack.push(makeEvent(state, 'base.stackEmpty'));
     stack.push(event);
 
     // while the stack is not empty, try to apply the top if the stack
