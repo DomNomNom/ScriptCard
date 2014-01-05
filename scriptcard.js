@@ -27,13 +27,16 @@ general terms:
                 event.name will be the key for the current function in stack.events
         this function can change state and event
 
+    requirement function:
+        a function in state.requirements
+        they are simmilar to event functions (take the same arguments) except:
+            They are pure functions. (do not modify state)
+            return true/false depending on whether the event/action is valid
+
     action:
         A event caused by a player.
         It has a .player reffering to the player who initiated the action.
-        It is a invalid action unless:
-            There is a function in state.requirements with the same key as the event function.
-            That function returns true.
-        These requirement functions are function(state, event) { return bool; }
+        It must have a requirement function which evaluates to true, otherwise it is invalid.
 
 
     trigger:
@@ -68,10 +71,62 @@ function makePlayer(name) {
     };
 }
 
+// gives the event a new ID
+function instantiateEvent(state, event) {
+    clone.id = state.nextEventID;
+    state.nextEventID += 1;
+}
+
+
+// adds packName if when it does not have a '.' in it
+// that way we can add the 'packName.' before 'eventName'
+function eventName(name, packName) {
+    if (event.indexOf('.') < 0) {
+        if (packName) {
+            return packName + '.' + name;
+        }
+        else {
+            throw new Error('pack not specified for event: ' + name);
+        }
+    }
+    return name;
+}
+
+// third argument is basically optional (see eventName())
+function makeEvent(state, eventOrEventName, packName) { // shorthand function
+    var event;
+    if (typeof event == 'string') {
+        event = { name: eventName(eventOrEventName) };
+    }
+    else if (typeof event == 'object') {
+        event = eventOrEventName;
+    }
+    else {
+        throw new TypeError('only strings and objects are valid for argument 2');
+    }
+
+    return instantiateEvent(state, event);
+}
+
+// instatiates a event and pushes it onto state.stack
+// the second argument is passed on to makeEvent
+// for external use.
+function push(state, event) {
+    state.stack.push(makeEvent(state, event));
+}
+
+// performs a clone of the event and assigns a new id
+function copyEvent(state, event) {
+    var clone = JSON.parse(JSON.stringify(event));
+    instantiateEvent(state, clone);
+    return clone;
+}
+
+
 var matchID = 0;
 function makeState() {
     matchID += 1;
-    return {
+    var state = {
         players: [
             makePlayer('Player 1'),
             makePlayer('Player 2')
@@ -84,13 +139,16 @@ function makeState() {
             post: {}
         },
         nextEventID: 1,
-        playing: false,  // whether the game allows player actions at the moment
+        playing: true,  // whether the game allows player actions at the moment
         packNames: [],  // this variable comes from server.js
 
         // not to be transmitted
         requirements: {},
             events: {},
     };
+    var setupEvent = makeEvent('base.setup');
+    applyEvent(state, setupEvent);
+    return state;
 }
 
 
@@ -149,18 +207,6 @@ function loadPackIntoState(state, pack, packName) {
 
 // ====== state modification ======
 
-function makeEvent(state, name) { // shorthand function
-    return copyEvent(state, {name: name});
-}
-
-// performs a clone of the event and assigns a new id
-function copyEvent(state, event) {
-    var clone = JSON.parse(JSON.stringify(event));
-
-    clone.id = state.nextEventID;
-    state.nextEventID += 1;
-    return clone;
-}
 
 // pushes a event that we haven't pushed yet onto the stack
 // phase can be 'pre' or 'post'

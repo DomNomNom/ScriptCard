@@ -8,10 +8,17 @@ function read(f) {
     return fs.readFileSync(f).toString();
 };
 function include(f) {
-    eval.apply(global, [read(f)]);  // note: we are executing nearly arbitrary code here
+    // try {
+        eval.apply(global, [read(f)]);  // note: we are executing nearly arbitrary code here
+    // }
+    // catch (e) {
+    //     throw new Error('Error in file: ' + f);
+    // }
+
 };
 
 include('scriptcard.js');   // base game logic
+// include('sizeof.js');       // for making sure player preferences don't get too big
 
 // ====== Include packs ======
 
@@ -46,7 +53,7 @@ function packFilePath(packName) {
 
 // ====== Webserver hander ======
 
-var app = require('http').createServer(handler);
+var app = require('http').createServer(handler).listen();
 var io = require('socket.io').listen(app);
 io.set('log level', 1);  // SILENCE!
 app.listen(9000);
@@ -149,6 +156,7 @@ io.sockets.on('connection', function (socket) {
         }
 
         event.player = player;
+        event.playerIndex = playerIndex;
 
         var requirement = state.requirements[event.name];
         if (!requirement) {
@@ -193,7 +201,6 @@ io.sockets.on('connection', function (socket) {
             applyEvent(state, copyEvent(state, event));
         }
 
-        emitAndApplyEvent(state, 'base.gameSetup');
         emitAndApplyEvent(state, 'base.gameStart');
     });
 });

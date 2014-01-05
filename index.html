@@ -70,7 +70,7 @@
           }
         }
         if (allReady) {
-          console.log('player Ready!!!!');
+          console.log('player ready!!!!');
           socket.emit('playerReady');
         }
       }
@@ -88,7 +88,7 @@
       packsLoaded[state.packNames[i]] = false;
     }
     for (var i in state.packNames) {
-      importPack(state.packNames[i]);
+      importPack(state.packNames[i]);  // asynchronous
     }
 
     $('#output').text('hello: ' + me.name);

@@ -1,21 +1,20 @@
-// this pack is required as it defines important events such as stackEmpty
+// this pack is required as it defines important events such as setup
 
-function doNothing(state, event) { }
+function makePack() {
+    function doNothing(state, event) { }
 
-function setPlaying(playing) {
-    // here we actually return a event function given
-    // what we should set state.playing to
-    return function setPlaying2(state, event) {
-        state.playing = playing;
+    function setPlaying(playing) {
+        // here we actually return a event function given
+        // what we should set state.playing to
+        return function setPlaying2(state, event) {
+            state.playing = playing;
+        }
     }
-}
 
-
-function makePack(){
     return {
         events: {
-            // these three event functions only exist to allow for triggers
-            gameSetup:  doNothing,  // before the game starts
+            // these event functions exist to allow for triggers
+            setup:  doNothing,  // right after state is created. only on server.
             gameStart:  setPlaying(true ),  // causes the first turn to occur
             gameEnd:    setPlaying(false),  // causes the game to end
             stackEmpty: doNothing,  // starts off at the bottom of the stack
