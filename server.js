@@ -39,10 +39,10 @@ function packFilePath(packName) {
 }
 
 // find all packs in the 'packs' directory and load them in
-var packFileNames = fs.readdirSync(__dirname +'/packs');
+var packFolderFiles = fs.readdirSync(__dirname +'/packs');
 var packNames = [];
-for (var i in packFileNames) {
-    var fileName = packFileNames[i];
+for (var i in packFolderFiles) {
+    var fileName = packFolderFiles[i];
     if (!fileName.endsWith('.js')) {
         console.error('non .js file in pack folder: ' + fileName);
         continue;
@@ -50,9 +50,6 @@ for (var i in packFileNames) {
     var packName = fileName.substring(0, fileName.length-3); // remove '.js'
     packNames.push(packName);
 
-    // load the pack
-    // include(packFilePath(packName)); // that file must have a definition for 'makePack'
-    // packs[packName] = makePack;
 }
 
 // load the packs and set them to be available in requirejs
@@ -76,7 +73,7 @@ requirejsPaths['scriptcard.js'] = 'scriptcard.js';
 requirejs.config({
     nodeRequire: require,
     baseUrl: __dirname,
-    paths: requirejsPaths,
+    // paths: requirejsPaths,
 });
 
 console.log('packNames1: ' + JSON.stringify(packNames));
@@ -102,10 +99,14 @@ function sendFile(res, fileName) {
         function (err, data) {
             if (err) {
                 res.writeHead(500);
+                console.log('Error loading: ' + fileName);
                 return res.end('Error loading: ' + fileName);
             }
 
-            res.writeHead(200);
+            var contentType = 'text/html';
+            if (fileName.endsWith('.js' )) contentType = 'text/javascript';
+            if (fileName.endsWith('.css')) contentType = 'text/css';
+            res.writeHead(200, { 'Content-Type': contentType });
             res.end(data);
         }
     );
@@ -119,13 +120,27 @@ function throw404(res) {
     res.end();
 }
 
+
+var routing = {
+    '': 'index.html',
+    '/': 'index.html',
+    '/index.html': 'index.html',
+    '/client.js': 'client.js',
+    '/jquery.js': 'jquery2.js',
+    '/require.js': 'node_modules/requirejs/require.js',
+    '/scriptcardclient.js': 'scriptcard.js', // this avoids some confict with requireJS
+    '/css/bootstrap.min.css': '/css/bootstrap.min.css',
+}
+for (var i in packNames) { // add the packs to routing
+    var packPath = packFilePath(packNames[i]);
+    routing['/'+packPath] = packPath;
+}
+console.log('routing: '+ JSON.stringify(routing));
+
 function handler(req, res) {
     var url = req.url;
-    if      (url == '/'             ) sendFile(res, 'index.html'    );
-    else if (url == '/client.js'    ) sendFile(res, 'client.js'     );
-    else if (url == '/require.js'   ) sendFile(res, 'node_modules/requirejs/require.js'    );
-    else if (url == '/jquery.js'    ) sendFile(res, 'jquery2.js'    );
-    else if (url == '/scriptcard.js') sendFile(res, 'scriptcard.js' );
+    console.log('URL: ' + url);
+    if (url in routing) sendFile(res, routing[url]);
     else if (url == '/favicon.ico'  ) { }
     // else if (url.substring(0, 7) == '/packs/') {
     //     // url should look like '/packs/cards.js'
@@ -295,7 +310,7 @@ requirejs(['scriptcard.js'], function(scriptCard) {
             function emitAndApplyEvent(state, eventName) {
                 var event = { name: eventName };
                 io.sockets.in(match.machID).emit('event', event);
-                scriptCard.applyEvent(state, copyEvent(state, event));
+                scriptCard.applyEvent(state, scriptCard.copyEvent(state, event));
             }
 
             emitAndApplyEvent(state, 'base.gameStart');

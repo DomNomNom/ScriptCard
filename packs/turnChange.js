@@ -10,7 +10,7 @@ define({
             // we can only end turns, not force begin
             return (
                 state.currentPlayer in state.players &&
-                state.players[state.currentPlayer] === data.player
+                state.players[state.currentPlayer] === event.player
             );
         }
     }

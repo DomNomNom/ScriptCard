@@ -1,14 +1,18 @@
 
 // we assume this script is loaded by requirejs on index.html
+console.log('a)');
 var socket = io.connect();
+console.log('b)');
 
 $(document).ready(function () {
   console.log("hello world!");
 
-  require(['scriptcard.js'], onScriptCard);
+  require(['scriptcardclient.js'], onScriptCard);
+  // require(['packs/base.js'], onScriptCard);
 })
 
 function onScriptCard(scriptCard) {
+  console.log("omg scriptcard: " + JSON.stringify(scriptCard));
 
   var state = null; // be the same accross all clients and server
   var myIndex = -1; // our index to state.players (varies per-client)
@@ -20,6 +24,9 @@ function onScriptCard(scriptCard) {
 
   // var exports = {};
   function importPack(packName) {
+    require(['/packs/' + packName + '.js'], function(pack) {
+
+    });
     // $.getScript(
     //   '/packs/' + packName + '.js',  // url
     //   function (data, textStatus, jqxhr) {
@@ -50,18 +57,25 @@ function onScriptCard(scriptCard) {
   }
 
   socket.on('initialState', function (data) {
+    console.log('initialState');
     state   = data.state;
     myIndex = data.playerIndex;
     me = state.players[myIndex];
 
     // load the packs
     // we set packsLoaded[...] = false first as we are doing asynchonous loading
-    for (var i in state.packNames) {
-      packsLoaded[state.packNames[i]] = false;
-    }
-    for (var i in state.packNames) {
-      importPack(state.packNames[i]);  // asynchronous
-    }
+    var packPaths = $.map(state.packNames, function (packName) {
+      return 'packs/'+packName+'.js';
+    });
+    require(packPaths, function loadPacks() {
+      for (var i in arguments) {
+        var pack = arguments[i];
+        scriptCard.loadPackIntoState(state, pack, state.packNames[i]);
+      }
+
+      console.log('player ready!!!!');
+      socket.emit('playerReady');
+    })
 
     $('#output').text('hello: ' + me.name);
   });
@@ -87,7 +101,7 @@ function onScriptCard(scriptCard) {
 
     // if there's no requirement, we just do what we're told by the server
 
-    applyEvent(state, event);    // change the state
+    scriptCard.applyEvent(state, event);    // change the state
 
   });
 
@@ -104,7 +118,7 @@ function onScriptCard(scriptCard) {
     console.log('ending turn');
     var action = { name: 'turnChange.turnChange' }
     socket.emit('action', action);
-    scriptCard.applyEvent(state, copyEvent(state, action));
+    scriptCard.applyEvent(state, scriptCard.copyEvent(state, action));
   });
 
 }; // onScriptCard

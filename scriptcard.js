@@ -65,7 +65,6 @@ general terms:
 // optimization: only send the code that the client needs to the client
 
 define(function() {
-
     return {
         omg: 3, // debug
 
@@ -251,6 +250,6 @@ define(function() {
                     console.log('stack loop too long, both loose');
                 }
             }
-        },
+        }
     }
 });
