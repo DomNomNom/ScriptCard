@@ -1,6 +1,5 @@
 // this pack is required as it defines important events such as setup
-
-function makePack() {
+define(function() {
     function doNothing(state, event) { }
 
     function setPlaying(playing) {
@@ -21,4 +20,4 @@ function makePack() {
         },
 
     };
-}
+})

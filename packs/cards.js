@@ -1,5 +1,5 @@
 
-function makePack() {
+define(function() {
 
     function shuffle(array) {
         // http://stackoverflow.com/questions/2450954/how-to-randomize-shuffle-a-javascript-array
@@ -83,4 +83,4 @@ function makePack() {
             },
         }
     };
-}
+});

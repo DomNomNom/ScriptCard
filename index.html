@@ -32,109 +32,11 @@
 </body>
 
 
-<script src="http://code.jquery.com/jquery-latest.min.js" type="text/javascript"></script>
+<!-- <script src="http://code.jquery.com/jquery-latest.min.js" type="text/javascript"></script> -->
+
 <script src="/socket.io/socket.io.js"></script>
-<script src="/scriptcard.js"></script>
-<script>
-
-  console.log("hello world!");
-  var socket = io.connect();
-  var state = null; // be the same accross all clients and server
-  var myIndex = -1; // our index to state.players (varies per-client)
-  var me = null;
-  var choices = null;
-  // var packNames = ['base', 'cards', 'consolelog', 'turnChange'];
-  var packs = {};
-  var packsLoaded = {};
-
-  function importPack(packName) {
-    $.getScript(
-      '/packs/' + packName + '.js',  // url
-      function (data, textStatus, jqxhr) {
-        // console.log(data ); // Data returned
-        // console.log(textStatus ); // Success
-        // console.log(jqxhr.status ); // 200
-        // console.log("Load was performed." );
-
-        // note: we are executing arbitrary code from the server here
-        // eval.apply(this, [data]);
-        loadPackIntoState(state, makePack(), packName);
-        packs[packName] = makePack;
-        packsLoaded[packName] = true;
-
-        var allReady = true;
-        for (var key in packsLoaded) {
-          if (!packsLoaded[key]) {
-            allReady = false;
-            return;
-          }
-        }
-        if (allReady) {
-          console.log('player ready!!!!');
-          socket.emit('playerReady');
-        }
-      }
-    );
-  }
-
-  socket.on('initialState', function (data) {
-    state   = data.state;
-    myIndex = data.playerIndex;
-    me = state.players[myIndex];
-
-    // load the packs
-    // we set packsLoaded[...] = false first as we are doing asynchonous loading
-    for (var i in state.packNames) {
-      packsLoaded[state.packNames[i]] = false;
-    }
-    for (var i in state.packNames) {
-      importPack(state.packNames[i]);  // asynchronous
-    }
-
-    $('#output').text('hello: ' + me.name);
-  });
-
-
-
-  socket.on('event', function (event) {
-    if (!event.name)    {
-        error('no event name');
-        return;
-    }
-
-
-    var requirement = state.requirements[event.name];
-    if (requirement) {
-      // check that the event meets the requrement
-      // we do this after relaying as the requirement function has the potential to change the state
-      if (!requirement(state, event)) {
-          error('event did not meet requirements: ' + JSON.stringify(event));
-          return;
-      }
-    }
-
-    // if there's no requirement, we just do what we're told by the server
-
-    applyEvent(state, event);    // change the state
-
-  });
-
-  function error(errorMessage) {
-    console.error(errorMessage);
-    $('#errorText').text(errorMessage);
-  }
-
-  socket.on('actionError', function(data) {
-    error(data.errorMessage)
-  });
-
-  $('#actionButton').click(function buttonAction() {
-    console.log('ending turn');
-    var action = { name: 'turnChange.turnChange' }
-    socket.emit('action', action);
-    applyEvent(state, copyEvent(state, action));
-  });
-
-</script>
+<script src="/jquery.js"></script>
+<!-- <script src="/scriptCard.js"></script> -->
+<script src="/require.js" data-main="client.js"></script>
 
 </html>
