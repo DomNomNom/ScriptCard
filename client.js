@@ -1,18 +1,15 @@
 
 // we assume this script is loaded by requirejs on index.html
-console.log('a)');
-var socket = io.connect();
-console.log('b)');
 
 $(document).ready(function () {
-  console.log("hello world!");
+  console.log('hello world!');
 
   require(['scriptcardclient.js'], onScriptCard);
   // require(['packs/base.js'], onScriptCard);
 })
 
 function onScriptCard(scriptCard) {
-  console.log("omg scriptcard: " + JSON.stringify(scriptCard));
+  console.log('got scriptCard.');
 
   var state = null; // be the same accross all clients and server
   var myIndex = -1; // our index to state.players (varies per-client)
@@ -21,40 +18,9 @@ function onScriptCard(scriptCard) {
   // var packNames = ['base', 'cards', 'consolelog', 'turnChange'];
   var packs = {};
   var packsLoaded = {};
+  var socket = io.connect();
 
   // var exports = {};
-  function importPack(packName) {
-    require(['/packs/' + packName + '.js'], function(pack) {
-
-    });
-    // $.getScript(
-    //   '/packs/' + packName + '.js',  // url
-    //   function (data, textStatus, jqxhr) {
-    //     // console.log(data ); // Data returned
-    //     // console.log(textStatus ); // Success
-    //     // console.log(jqxhr.status ); // 200
-    //     // console.log("Load was performed." );
-
-    //     // note: we are executing arbitrary code from the server here
-    //     // eval.apply(this, [data]);
-    //     scriptCard.loadPackIntoState(state, makePack(), packName);
-    //     packs[packName] = makePack;
-    //     packsLoaded[packName] = true;
-
-    //     var allReady = true;
-    //     for (var key in packsLoaded) {
-    //       if (!packsLoaded[key]) {
-    //         allReady = false;
-    //         return;
-    //       }
-    //     }
-    //     if (allReady) {
-    //       console.log('player ready!!!!');
-    //       socket.emit('playerReady');
-    //     }
-    //   }
-    // );
-  }
 
   socket.on('initialState', function (data) {
     console.log('initialState');
@@ -71,9 +37,10 @@ function onScriptCard(scriptCard) {
       for (var i in arguments) {
         var pack = arguments[i];
         scriptCard.loadPackIntoState(state, pack, state.packNames[i]);
+        // console.debug('loaded pack: ' + state.packNames[i]);
       }
 
-      console.log('player ready!!!!');
+      console.log('playerReady');
       socket.emit('playerReady');
     })
 
