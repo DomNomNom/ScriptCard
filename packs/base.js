@@ -1,5 +1,5 @@
 // this pack is required as it defines important events such as setup
-define(function() {
+define(['scriptcard.js'], function(scriptCard) {
     function doNothing(state, event) { }
 
     function setPlaying(playing) {
@@ -17,6 +17,17 @@ define(function() {
             gameStart:  setPlaying(true ),  // causes the first turn to occur
             gameEnd:    setPlaying(false),  // causes the game to end
             stackEmpty: doNothing,  // starts off at the bottom of the stack
+
+            // see scriptcard.triggerOnce
+            triggerOnce: function (state, event) {
+                scriptCard.push(state, event.wrapTrigger);
+                scriptCard.triggerRemove(
+                    state,
+                    event.triggerID,
+                    event.wrapCauseName,
+                    event.wrapPhase
+                );
+            }
         },
 
     };

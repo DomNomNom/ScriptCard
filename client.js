@@ -4,7 +4,7 @@
 $(document).ready(function () {
   console.log('hello world!');
 
-  require(['scriptcardclient.js'], onScriptCard);
+  require(['scriptcard.js'], onScriptCard);
   // require(['packs/base.js'], onScriptCard);
 })
 
@@ -15,12 +15,10 @@ function onScriptCard(scriptCard) {
   var myIndex = -1; // our index to state.players (varies per-client)
   var me = null;
   var choices = null;
-  // var packNames = ['base', 'cards', 'consolelog', 'turnChange'];
   var packs = {};
   var packsLoaded = {};
   var socket = io.connect();
 
-  // var exports = {};
 
   socket.on('initialState', function (data) {
     console.log('initialState');
@@ -29,7 +27,6 @@ function onScriptCard(scriptCard) {
     me = state.players[myIndex];
 
     // load the packs
-    // we set packsLoaded[...] = false first as we are doing asynchonous loading
     var packPaths = $.map(state.packNames, function (packName) {
       return 'packs/'+packName+'.js';
     });

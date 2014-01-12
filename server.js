@@ -1,7 +1,6 @@
 var fs = require('fs');
 var util = require('util');
 
-
 // ====== Include scriptcard.js functions ======
 
 function read(f) {
@@ -124,13 +123,13 @@ function throw404(res) {
 var routing = {
     '': 'index.html',
     '/': 'index.html',
-    '/index.html': 'index.html',
     '/client.js': 'client.js',
     '/jquery.js': 'jquery2.js',
+    '/index.html': 'index.html',
+    '/scriptcard.js' : 'scriptcard.js',
     '/require.js': 'node_modules/requirejs/require.js',
-    '/scriptcardclient.js': 'scriptcard.js', // this avoids some confict with requireJS
     '/css/bootstrap.min.css': '/css/bootstrap.min.css',
-}
+};
 for (var i in packNames) { // add the packs to routing
     var packPath = packFilePath(packNames[i]);
     routing['/'+packPath] = packPath;

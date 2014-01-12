@@ -12,8 +12,10 @@ general terms:
 
         Here are some important fields of a event:
             name        // required.  corresponds to the key for function in state.events.
-            id          // generated. should be unique for each event.
-            triggered   // generated. keeps track of which triggers this has caused
+            id          // should be unique for each event. instatiateEvent() will set this
+            triggered   // keeps track of which triggers this has caused
+            cause       // (only if also a trigger) a reference to the event causing the trigger event
+            triggerID   // (only if also a trigger) the ID of the trigger
 
         It is common for events to have more fields as they can be used in event functions
 
@@ -41,12 +43,12 @@ general terms:
 
     trigger:
         An event which is in a list within state.triggers.
-        A simple example of a definition of state.triggers:
+        A simple example of a snapshot of state.triggers:
         {
             'pre': {},      // executed when a event happens (when it is about to happen)
             'post': {       // executed when a event just happened
                 'turnchange' : [
-                    { name: 'drawCard' }
+                    { name: 'drawCard', triggerID: 3 }
                 ]
             }
         }
@@ -164,15 +166,10 @@ define(function() {
             var statePhase = state.triggers[triggerPhase];
 
             var phase = pack.triggers[triggerPhase];
-            for (var cause in phase) {
-                if (!(cause in statePhase)) {
-                    statePhase[cause] = [];
-                }
-                var stateTriggers = statePhase[cause];
-
-                var triggers = phase[cause];
+            for (var causeName in phase) {
+                var triggers = phase[causeName];
                 for (var i in triggers) {
-                    stateTriggers.push(triggers[i]);
+                    this.triggerAdd(state, triggers[i], causeName, triggerPhase)
                 }
             }
           }
@@ -182,24 +179,6 @@ define(function() {
         // ====== state modification ======
 
 
-        // pushes a event that we haven't pushed yet onto the stack
-        // phase can be 'pre' or 'post'
-        pushTrigger: function (state, event, phase) {
-            if (!(phase in state.triggers)) {
-                console.error('invalid trigger phase: ' + phase);
-                return;
-            }
-
-            var triggers = state.triggers[phase][event];
-            for (var i in triggers) { // the order of the array defines order
-                var trigger = triggers[i];
-                if (!(trigger.id in event.triggered)) {
-                    event.triggered[trigger.id] = true;
-                    state.stack.push(this.copyEvent(trigger));
-                }
-            }
-        },
-
         // this is the function that gets things rolling
         applyEvent: function (state, event) {
             var stack = state.stack;
@@ -208,7 +187,7 @@ define(function() {
                 console.error('stack needs to be emtpy');
                 return;
             }
-            event = this.copyEvent(state, event); // ensure it is given a good id
+            event = this.instantiateEvent(state, event); // ensure it is given a good id
 
             stack.push(this.makeEvent(state, 'base.stackEmpty'));
             stack.push(event);
@@ -250,6 +229,93 @@ define(function() {
                     console.log('stack loop too long, both loose');
                 }
             }
+        },
+
+        // pushes a event that we haven't pushed yet onto the stack
+        // phase can be 'pre' or 'post'
+        pushTrigger: function (state, event, phase) {
+            if (!(phase in state.triggers)) {
+                console.error('invalid trigger phase: ' + phase);
+                return;
+            }
+
+            var triggers = state.triggers[phase][event];
+            for (var i in triggers) { // the order of the array defines order
+                var trigger = triggers[i];
+                if (!(trigger.id in event.triggered)) {
+                    event.triggered[trigger.id] = true;
+                    var triggerEvent = this.copyEvent(trigger);
+                    triggerEvent.cause = event;
+                    triggerEvent.triggerID = trigger;
+                    state.stack.push(triggerEvent);
+                }
+            }
+        },
+
+
+        // ====== Triggers ======
+
+
+        // registers a trigger to happen from here on
+        // phase is optional and defaults to 'pre'
+        triggerAdd: function (state, trigger, causeName, phase) {
+            // verify phase
+            if (typeof phase === 'undefined') {  phase = 'pre';  }
+            if (!(phase in state.triggers)) {
+                throw new Error('triggerOnce got an invalid phase: ' + phase);
+            }
+
+            var phaseTriggers = state.triggers[phase];
+            var triggerList;
+            if (causeName in phaseTriggers) {
+                triggerList = phaseTriggers[causeName];
+            }
+            else {
+                triggerList = phaseTriggers[causeName] = [];
+            }
+            triggerList.push(trigger);
+
+        },
+
+        // registers a trigger to happen at most once from here on
+        // this is done by making a wrapping trigger such that
+        //      the given trigger is put on the stack
+        //      the wrapper is gets removed from the trigger list
+        // arguments are the same as for scriptcard.trigger()
+        triggerOnce: function (state, trigger, causeName, phase) {
+            // veryfy phase
+            if (typeof phase === 'undefined') {  phase = 'pre';  }
+            if (!(phase in state.triggers)) {
+                throw new Error('triggerOnce got an invalid phase: ' + phase);
+            }
+
+            var wrappingTrigger = {
+                name: 'base.triggerOnce',
+                wrapTrigger: trigger,
+                wrapCauseName: causeName,
+                wrapPhase: phase,
+            };
+
+            this.triggerAdd(state, wrappingTrigger, cause, phase);
+        },
+
+        triggerRemove: function (state, triggerID, causeName, phase) {
+            // verify phase
+            if (typeof phase === 'undefined') {  phase = 'pre';  }
+            if (!(phase in state.triggers)) {
+                throw new Error('triggerOnce got an invalid phase: ' + phase);
+            }
+
+            var phaseDict = state.triggers[phase];
+            if (!(causeName in phaseDict)) {
+                return;
+            }
+
+            phaseDict[causeName] = phaseDict[causeName].filter(function (trigger) {
+                return trigger.id != triggerID
+            });
+
         }
-    }
+
+    } // return {}
 });
