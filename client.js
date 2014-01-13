@@ -4,12 +4,13 @@
 $(document).ready(function () {
   console.log('hello world!');
 
-  require(['scriptcard.js'], onScriptCard);
+  require(['scriptcard.js', 'jsonStringify.js'], onScriptCard);
   // require(['packs/base.js'], onScriptCard);
 })
 
-function onScriptCard(scriptCard) {
+function onScriptCard(scriptCard, jsonStringify) {
   console.log('got scriptCard.');
+
 
   var state = null; // be the same accross all clients and server
   var myIndex = -1; // our index to state.players (varies per-client)
@@ -21,6 +22,11 @@ function onScriptCard(scriptCard) {
 
 
   socket.on('initialState', function (data) {
+    var a= { a:[1] };
+    a.b = a.a;
+    a.b.push(2);
+    socket.emit('test', jsonStringify.make(a));
+
     console.log('initialState');
     state   = data.state;
     myIndex = data.playerIndex;
@@ -39,7 +45,7 @@ function onScriptCard(scriptCard) {
 
       console.log('playerReady');
       socket.emit('playerReady');
-    })
+    });
 
     $('#output').text('hello: ' + me.name);
   });

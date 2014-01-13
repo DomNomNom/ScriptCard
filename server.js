@@ -39,6 +39,12 @@ function packFilePath(packName) {
 
 // find all packs in the 'packs' directory and load them in
 var packFolderFiles = fs.readdirSync(__dirname +'/packs');
+
+// ensure the base pack is loaded as the first package start
+var basePackName = 'base.js';
+packFolderFiles.splice(packFolderFiles.indexOf(basePackName), 1);
+packFolderFiles.unshift(basePackName)
+
 var packNames = [];
 for (var i in packFolderFiles) {
     var fileName = packFolderFiles[i];
@@ -127,6 +133,7 @@ var routing = {
     '/jquery.js': 'jquery2.js',
     '/index.html': 'index.html',
     '/scriptcard.js' : 'scriptcard.js',
+    '/jsonStringify.js' : 'jsonStringify.js',
     '/require.js': 'node_modules/requirejs/require.js',
     '/css/bootstrap.min.css': '/css/bootstrap.min.css',
 };
@@ -165,7 +172,7 @@ function handler(req, res) {
 
 // ====== Socket server ======
 
-requirejs(['scriptcard.js'], function(scriptCard) {
+requirejs(['scriptcard.js', 'jsonStringify.js'], function(scriptCard, jsonStringify) {
     var matchID = 0;
 
     function makePlayer(name) {
@@ -244,11 +251,17 @@ requirejs(['scriptcard.js'], function(scriptCard) {
         var playerIndex = match.playerIndex;
         var player = state.players[playerIndex]
 
-        // load the pack
 
         socket.join(match.machID); // so we can talk to our partners
 
         socket.emit('initialState', {state: state, playerIndex: playerIndex});
+
+        socket.on('test', function(data) {
+            console.log('aaaa: ' + JSON.stringify(data));
+            data = jsonStringify.toObject(data);
+            data.b.push(3);
+            console.log('aaaa: ' + JSON.stringify(data));
+        });
 
         socket.on('action', function (event) {
             function error(errorMessage) {

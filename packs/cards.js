@@ -1,5 +1,5 @@
 
-define(function() {
+define(['scriptcard.js'], function(scriptCard) {
 
     function shuffle(array) {
         // http://stackoverflow.com/questions/2450954/how-to-randomize-shuffle-a-javascript-array
@@ -48,18 +48,18 @@ define(function() {
             submitDeck: function (state, event) {
                 var deck = event.deck || [];
                 if (!deck.length) {
-                    push('cards.deckSubmitted'); // say we are done
+                    scriptCard.push('cards.deckSubmitted'); // say we are done
                     return;
                 }
 
                 // note: reverse order of pushes because we operate on a stack
-                push(state, 'cards.deckSubmitted');
+                scriptCard.push(state, 'cards.deckSubmitted');
 
                 // we are guaranteed to have at least one card in our deck
                 for (var i=deck.length-1; i>=0; i--) {
                     var card = deck[i];
-                    push(state, { name: 'cards.putCardIntoDeck', card: card, player: player });
-                    push(state, { name: 'cards.instantiateCard', card: card } );
+                    scriptCard.push(state, { name: 'cards.putCardIntoDeck', card: card, player: player });
+                    scriptCard.push(state, { name: 'cards.instantiateCard', card: card } );
                 };
 
             },
