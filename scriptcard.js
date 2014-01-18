@@ -80,7 +80,7 @@ define(function() {
 
         // adds packName if when it does not have a '.' in it
         // that way we can add the 'packName.' before 'eventName'
-        eventName: function (name, packName) {
+        makeEventName: function (name, packName) {
             if (name.indexOf('.') < 0) {
                 if (packName) {
                     return packName + '.' + name;
@@ -89,14 +89,17 @@ define(function() {
                     throw new Error('pack not specified for event: ' + name);
                 }
             }
+
             return name;
         },
 
-        // third argument is basically optional (see eventName())
-        makeEvent: function (state, eventOrEventName, packName) { // shorthand function
+        // third argument is basically optional (see makeEventName())
+        makeEvent: function (state, eventOrEventName, packName) {
             var event;
             if (typeof eventOrEventName == 'string') {
-                event = { name: this.eventName(eventOrEventName) };
+                event = {
+                    name: this.makeEventName(eventOrEventName, packName)
+                };
             }
             else if (typeof eventOrEventName == 'object') {
                 event = eventOrEventName;
@@ -131,56 +134,89 @@ define(function() {
         // this has to be done on the client side as well
 
         loadPackIntoState: function (state, pack, packName) {
-          // events
-          for (var eventName in pack.events) {
-            var globalEventName = packName+'.'+eventName;
-            if (globalEventName in state.events) {
-              console.error('duplicate event name: ' + globalEventName);
-              continue;
+            // events
+            for (var eventName in pack.events) {
+                var globalEventName = packName+'.'+eventName;
+                if (globalEventName in state.events) {
+                    console.error('duplicate event name: ' + globalEventName);
+                    continue;
+                }
+
+                // console.log('loading event: ' + globalEventName);
+                state.events[globalEventName] = pack.events[eventName];
             }
 
-            // console.log('loading event: ' + globalEventName);
-            state.events[globalEventName] = pack.events[eventName];
-          }
+            // requirements
+            for (var eventName in pack.requirements) {
+                var globalEventName = packName+'.'+eventName;
+                if (!(globalEventName in state.events)) {
+                    console.warn("requirement without event: " + globalEventName);
+                }
+                if (globalEventName in state.requirements) {
+                    console.error('duplicate requirement name: ' + globalEventName);
+                    continue;
+                }
 
-          // requirements
-          for (var eventName in pack.requirements) {
-            var globalEventName = packName+'.'+eventName;
-            if (!(globalEventName in state.events)) {
-                console.warning("requirement without event: " + globalEventName);
+                state.requirements[globalEventName] = pack.requirements[eventName];
             }
-            if (globalEventName in state.requirements) {
-              console.error('duplicate requirement name: ' + globalEventName);
-              continue;
-            }
 
-            state.requirements[globalEventName] = pack.requirements[eventName];
-          }
+            // triggers
+            for (var phaseName in pack.triggers) {
+                if (!(phaseName in state.triggers)) {
+                    state.triggers[phaseName] = {};
+                    console.log('new type of phaseName: ' + phaseName);
+                }
+                var statePhase = state.triggers[phaseName];
 
-          // triggers
-          for (var triggerPhase in pack.triggers) {
-            if (!(triggerPhase in state.triggers)) {
-                state.triggers[triggerPhase] = {};
-                console.log('new type of triggerPhase: ' + triggerPhase);
-            }
-            var statePhase = state.triggers[triggerPhase];
+                var phaseObject = pack.triggers[phaseName];
+                for (var causeName in phaseObject) {
+                    causeName = this.makeEventName(causeName, packName);
+                    if (!(causeName in state.events)) {
+                        console.warn('adding triggers for unknown causeName: ' + causeName);
+                    }
+                    var triggers = phaseObject[causeName];
 
-            var phase = pack.triggers[triggerPhase];
-            for (var causeName in phase) {
-                var triggers = phase[causeName];
-                for (var i in triggers) {
-                    this.applyEvent(
-                        state,
-                        this.makeEvent(state, {
-                            name: 'base.triggerAdd',
-                            trigger: triggers[i],
-                            causeName: causeName,
-                            phase:  triggerPhase
-                        })
-                    );
+                    var scriptCard = this;
+                    function addTrigger(triggerName) {
+
+                        var trigger = scriptCard.makeEvent(state, triggerName, packName);
+
+                        // sanity check that the event actually exists
+                        if (!(trigger.name in state.events)) {
+                            console.error('trigger has a unknown event name: ' + trigger.name);
+                            return;
+                        }
+
+                        scriptCard.applyEvent(
+                            state,
+                            scriptCard.makeEvent(state, {
+                                name: 'base.triggerAdd',
+                                trigger: trigger,
+                                causeName: causeName,
+                                phase:  phaseName
+                            })
+                        );
+                    }
+
+                    // we accept strings and lists of strings as values
+                    if (typeof triggers === "string") {
+                        addTrigger(triggers); // a single trigger
+                    }
+                    else if (triggers instanceof Array) {
+                        // a list of triggers
+                        for (var i in triggers) {
+                            if (typeof triggers[i] !== "string") {
+                                logging.error('trigger list should be a string or a list of strings but the list contined this: ' + triggers[i]);
+                                continue;
+                            }
+                            addTrigger(triggers[i]);
+                        }
+                    }
+                    else {
+                        console.error('['+packName+'] triggers should be a string or a list of strings but you gave this: ' + triggers);
+                    }
                 }
             }
-          }
         },
 
 
@@ -212,8 +248,8 @@ define(function() {
         // this is the function that gets things rolling
         applyEvent: function (state, event) {
             var stack = state.stack;
-            console.log("applying event: " + event.name);
-                if (stack.length != 0)  {
+            // console.log("applying event: " + event.name);
+            if (stack.length != 0)  {
                 console.error('stack needs to be emtpy');
                 return;
             }
@@ -246,7 +282,12 @@ define(function() {
                         imminentEvent.data = {};
                     }
 
-                    console.log('executing event: ' + JSON.stringify(imminentEvent))
+                    if (imminentEvent.name != 'base.stackEmpty') {
+                        console.log(
+                            'executing event: ' +
+                            JSON.stringify(imminentEvent)
+                        );
+                    }
                     eventFunction(state, imminentEvent.data);
                 }
             }

@@ -76,10 +76,10 @@ define(['scriptcard.js'], function(scriptCard) {
         },
         triggers: {
             'pre': {
-                'base.setup': { name: 'cards.setup' }
+                'base.setup': 'cards.setup',
             },
             'post': {
-                'turnChange.turnChange' : { name: 'cards.drawCard' }
+                'turnChange.turnChange' : ['cards.drawCard'],
             },
         }
     };

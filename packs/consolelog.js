@@ -7,7 +7,7 @@ define({
     },
     triggers: {
         pre: {
-            'gameSetup': { name: 'consolelog.consolelog' }
+            'base.gameSetup': 'consolelog.consolelog',
         }
     }
 });

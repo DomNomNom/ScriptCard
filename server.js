@@ -207,12 +207,17 @@ requirejs(['scriptcard.js', 'jsonStringify.js'], function(scriptCard, jsonString
 
         // load packs
         state.packNames = packNames;
+        // var orderedPacks = [];
+        // for (var i in packNames) {
+        //     orderedPacks.push(packs[packNames[i]]);
+        // }
+
         for (var i in packNames) {
             var packName = packNames[i];
             if (!packName in packs) {
                 console.warn('unknown packName: ' + packName);
             }
-            console.log('loading state: ' + packName + ' - ' + packs[packName])
+            // console.log('loading state: ' + packName + ' - ' + packs[packName])
             scriptCard.loadPackIntoState(
                 state,
                 packs[packName],
