@@ -207,23 +207,27 @@ requirejs(['scriptcard.js', 'jsonStringify.js'], function(scriptCard, jsonString
 
         // load packs
         state.packNames = packNames;
-        // var orderedPacks = [];
-        // for (var i in packNames) {
-        //     orderedPacks.push(packs[packNames[i]]);
-        // }
-
+        var orderedPacks = [];
         for (var i in packNames) {
-            var packName = packNames[i];
-            if (!packName in packs) {
-                console.warn('unknown packName: ' + packName);
-            }
-            // console.log('loading state: ' + packName + ' - ' + packs[packName])
-            scriptCard.loadPackIntoState(
-                state,
-                packs[packName],
-                packName
-            );
+            var pack = packs[packNames[i]];
+            pack.name = packNames[i];
+            orderedPacks.push(pack);
         }
+
+        scriptCard.loadPacksIntoState(state, orderedPacks);
+
+        // for (var i in packNames) {
+        //     var packName = packNames[i];
+        //     if (!packName in packs) {
+        //         console.warn('unknown packName: ' + packName);
+        //     }
+        //     // console.log('loading state: ' + packName + ' - ' + packs[packName])
+        //     scriptCard.loadPackIntoState(
+        //         state,
+        //         packs[packName],
+        //         packName
+        //     );
+        // }
 
         // allow packs to setup the state
         var setupEvent = scriptCard.makeEvent(state, 'base.setup');

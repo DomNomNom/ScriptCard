@@ -8,14 +8,13 @@ general terms:
         it ideally should be indentical on the server and client
 
     event:
-        A JSON object which must have a .name
+        A JSON object which must have a .name correspoinding to a key in state.events
 
         Here are some important fields of a event:
             name        // required.  corresponds to the key for function in state.events.
             id          // should be unique for each event. instatiateEvent() will set this
             triggered   // keeps track of which triggers this has caused
-            cause       // (only if also a trigger) a reference to the event causing the trigger event
-            triggerID   // (only if also a trigger) the ID of the trigger
+            cause       // (only if it is a trigger-caused event) a reference to the event causing the trigger
 
         It is common for events to have more fields as they can be used in event functions
 
@@ -48,10 +47,12 @@ general terms:
             'pre': {},      // executed when a event happens (when it is about to happen)
             'post': {       // executed when a event just happened
                 'turnchange' : [
-                    { name: 'drawCard', triggerID: 3 }
+                    { name: 'drawCard', id: 3 }
                 ]
             }
         }
+        in this example, after the cause ('turnchange') occurs,
+        the trigger (drawCard object) is deep-copied and pushed on the stack
 
     stack:
         a stack of events, defining their order of execution
@@ -66,7 +67,7 @@ general terms:
 // ====== state creation (only server should do this) ======
 // optimization: only send the code that the client needs to the client
 
-define(function() {
+define(['jsonStringify.js'], function(jsonStringify) {
     return {
         omg: 3, // debug
 
@@ -123,8 +124,17 @@ define(function() {
             );
         },
 
-        // performs a clone of the event and assigns a new id
+        // performs a deep-copy the event of the event and assigns a new id
         copyEvent: function (state, event) {
+            if (!state || !event) {
+                throw new Error('copyEvent requires all arguments.');
+            }
+            // console.log('omg: ' + JSON.stringify(event));
+            // for (var key in event) {
+            //     console.log('   ' + key + ": " + event[key]);
+            // }
+
+            // var clone = jsonStringify.toObject(jsonStringify.make(event));
             var clone = JSON.parse(JSON.stringify(event));
             return this.instantiateEvent(state, clone);
         },
@@ -133,91 +143,111 @@ define(function() {
 
         // this has to be done on the client side as well
 
-        loadPackIntoState: function (state, pack, packName) {
-            // events
-            for (var eventName in pack.events) {
-                var globalEventName = packName+'.'+eventName;
-                if (globalEventName in state.events) {
-                    console.error('duplicate event name: ' + globalEventName);
-                    continue;
-                }
-
-                // console.log('loading event: ' + globalEventName);
-                state.events[globalEventName] = pack.events[eventName];
+        loadPacksIntoState: function (state, packs) {
+            function error(pack, message) {
+                console.error('error loading ' + pack.name + ': ' + message);
             }
+
+            // sanity check that all packs have a .name
+            for (var i in packs) {
+                if (!packs[i].name) {
+                    console.error('All packs must have a .name; packs['+i+'] doesnt.');
+                    return;
+                }
+            }
+
+            // events
+            packs.forEach(function loadEvents(pack) {
+                for (var eventName in pack.events) {
+                    var globalEventName = pack.name+'.'+eventName;
+                    if (globalEventName in state.events) {
+                        error(pack, 'duplicate event name: ' + globalEventName);
+                        continue;
+                    }
+
+                    // console.log('loading event: ' + globalEventName);
+                    state.events[globalEventName] = pack.events[eventName];
+                }
+            });
 
             // requirements
-            for (var eventName in pack.requirements) {
-                var globalEventName = packName+'.'+eventName;
-                if (!(globalEventName in state.events)) {
-                    console.warn("requirement without event: " + globalEventName);
-                }
-                if (globalEventName in state.requirements) {
-                    console.error('duplicate requirement name: ' + globalEventName);
-                    continue;
-                }
+            packs.forEach(function loadRequirements(pack) {
+                for (var eventName in pack.requirements) {
+                    var globalEventName = pack.name+'.'+eventName;
+                    if (!(globalEventName in state.events)) {
+                        error(pack, 'requirement without event: ' + globalEventName);
+                        continue;
+                    }
+                    if (globalEventName in state.requirements) {
+                        error(pack, 'duplicate requirement name: ' + globalEventName);
+                        continue;
+                    }
 
-                state.requirements[globalEventName] = pack.requirements[eventName];
-            }
+                    state.requirements[globalEventName] = pack.requirements[eventName];
+                }
+            });
 
             // triggers
-            for (var phaseName in pack.triggers) {
-                if (!(phaseName in state.triggers)) {
-                    state.triggers[phaseName] = {};
-                    console.log('new type of phaseName: ' + phaseName);
-                }
-                var statePhase = state.triggers[phaseName];
+            var scriptCard = this;
+            packs.forEach(function loadtriggers(pack) {
 
-                var phaseObject = pack.triggers[phaseName];
-                for (var causeName in phaseObject) {
-                    causeName = this.makeEventName(causeName, packName);
-                    if (!(causeName in state.events)) {
-                        console.warn('adding triggers for unknown causeName: ' + causeName);
+                for (var phaseName in pack.triggers) {
+                    if (!(phaseName in state.triggers)) {
+                        state.triggers[phaseName] = {};
+                        console.log('new type of phaseName: ' + phaseName);
                     }
-                    var triggers = phaseObject[causeName];
+                    var statePhase = state.triggers[phaseName];
 
-                    var scriptCard = this;
-                    function addTrigger(triggerName) {
-
-                        var trigger = scriptCard.makeEvent(state, triggerName, packName);
-
-                        // sanity check that the event actually exists
-                        if (!(trigger.name in state.events)) {
-                            console.error('trigger has a unknown event name: ' + trigger.name);
-                            return;
+                    var phaseObject = pack.triggers[phaseName];
+                    for (var causeName in phaseObject) {
+                        causeName = scriptCard.makeEventName(causeName, pack.name);
+                        if (!(causeName in state.events)) {
+                            error(pack, 'adding triggers for unknown causeName: ' + causeName);
                         }
+                        var triggers = phaseObject[causeName];
 
-                        scriptCard.applyEvent(
-                            state,
-                            scriptCard.makeEvent(state, {
-                                name: 'base.triggerAdd',
-                                trigger: trigger,
-                                causeName: causeName,
-                                phase:  phaseName
-                            })
-                        );
-                    }
+                        function addTrigger(triggerName) {
 
-                    // we accept strings and lists of strings as values
-                    if (typeof triggers === "string") {
-                        addTrigger(triggers); // a single trigger
-                    }
-                    else if (triggers instanceof Array) {
-                        // a list of triggers
-                        for (var i in triggers) {
-                            if (typeof triggers[i] !== "string") {
-                                logging.error('trigger list should be a string or a list of strings but the list contined this: ' + triggers[i]);
-                                continue;
+                            var trigger = scriptCard.makeEvent(state, triggerName, pack.name);
+
+                            // sanity check that the event actually exists
+                            if (!(trigger.name in state.events)) {
+                                error(pack, 'trigger has a unknown event name: ' + trigger.name);
+                                return;
                             }
-                            addTrigger(triggers[i]);
+
+                            scriptCard.applyEvent(
+                                state,
+                                scriptCard.makeEvent(state, {
+                                    name: 'base.triggerAdd',
+                                    trigger: trigger,
+                                    causeName: causeName,
+                                    phase:  phaseName
+                                })
+                            );
+                        }
+
+                        // we accept strings and lists of strings as values
+                        if (typeof triggers === "string") {
+                            addTrigger(triggers); // a single trigger
+                        }
+                        else if (triggers instanceof Array) {
+                            // a list of triggers
+                            for (var i in triggers) {
+                                if (typeof triggers[i] !== "string") {
+                                    error(pack, 'trigger list should be a string or a list of strings but the list contined this: ' + triggers[i]);
+                                    continue;
+                                }
+                                addTrigger(triggers[i]);
+                            }
+                        }
+                        else {
+                            error(pack, 'triggers should be a string or a list of strings but you gave this: ' + triggers);
                         }
                     }
-                    else {
-                        console.error('['+packName+'] triggers should be a string or a list of strings but you gave this: ' + triggers);
-                    }
                 }
-            }
-        },
+            });
+        }, // end loadPacksIntoState
 
 
         // ====== state modification ======
@@ -231,14 +261,17 @@ define(function() {
                 return;
             }
 
-            var triggers = state.triggers[phase][event];
+            var triggers = state.triggers[phase][event.name];
             for (var i in triggers) { // the order of the array defines order
                 var trigger = triggers[i];
+                if (!event.triggered) {
+                    event.triggered = {};
+                }
                 if (!(trigger.id in event.triggered)) {
-                    event.triggered[trigger.id] = true;
-                    var triggerEvent = this.copyEvent(trigger);
+                    var triggerEvent = this.copyEvent(state, trigger);
                     triggerEvent.cause = event;
-                    triggerEvent.triggerID = trigger;
+                    // triggerEvent.triggerID = trigger;
+                    event.triggered[trigger.id] = triggerEvent;
                     state.stack.push(triggerEvent);
                 }
             }
@@ -278,17 +311,19 @@ define(function() {
                         console.error('could not find eventFunction: ' + imminentEvent.name)
                         continue;
                     }
-                    if (!imminentEvent.data) {
-                        imminentEvent.data = {};
-                    }
 
                     if (imminentEvent.name != 'base.stackEmpty') {
+                        // console.log('aaa ' + jsonStringify imminentEvent);
+                        // console.log('boop')
+                        // for (var k in imminentEvent.cause) {
+                        //         console.log('   ' + k + ': ' + imminentEvent.cause[k])
+                        // }
                         console.log(
                             'executing event: ' +
-                            JSON.stringify(imminentEvent)
+                            this.debugEvent(imminentEvent)
                         );
                     }
-                    eventFunction(state, imminentEvent.data);
+                    eventFunction(state, imminentEvent);
                 }
             }
 
@@ -302,6 +337,14 @@ define(function() {
             }
         },
 
-
+        // stringifies a event to a human-readable string
+        // avoids bugs with circular references by only going 1 layer deep
+        debugEvent: function(event) {
+            var values = []
+            for (var key in event) {
+                values.push(key + ': ' + event[key])
+            }
+            return '{ ' + values.join(', ') + ' }';
+        }
     } // return {}
 });

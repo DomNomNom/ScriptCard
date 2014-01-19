@@ -1,13 +1,18 @@
-define({
-    cards: [],
-    events: {
-        consolelog: function (state, data) {
-            console.log("consolelog: " + JSON.stringify(data));
-        }
-    },
-    triggers: {
-        pre: {
-            'base.gameSetup': 'consolelog.consolelog',
+define(['scriptcard.js'], function (scriptCard) {
+    return {
+        cards: [],
+        events: {
+            consolelog: function (state, event) {
+                console.log(
+                    'consolelog: ' +
+                    scriptCard.debugEvent(event)
+                );
+            }
+        },
+        triggers: {
+            pre: {
+                'base.setup': 'consolelog.consolelog',
+            }
         }
     }
 });

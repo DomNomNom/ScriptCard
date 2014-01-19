@@ -37,16 +37,18 @@ function onScriptCard(scriptCard, jsonStringify) {
       return 'packs/'+packName+'.js';
     });
     require(packPaths, function loadPacks() {
-      var packs = arguments; // arguments to this function
-
-      // for (var i in packs) {
-      //   packs[i].name = state.packNames[i];
-      // }
+      var packs = [];
       for (var i in arguments) {
         var pack = arguments[i];
-        scriptCard.loadPackIntoState(state, pack, state.packNames[i]);
-        // console.debug('loaded pack: ' + state.packNames[i]);
+        pack.name = state.packNames[i];
+        packs.push(pack);
       }
+      scriptCard.loadPacksIntoState(state, packs);
+      // for (var i in arguments) {
+      //   var pack = arguments[i];
+      //   scriptCard.loadPackIntoState(state, pack, state.packNames[i]);
+      //   // console.debug('loaded pack: ' + state.packNames[i]);
+      // }
 
       console.log('playerReady');
       socket.emit('playerReady');
